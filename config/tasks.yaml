@@ -1,0 +1,29 @@
+brd_analysis:
+  description: >
+    Analyze the BRD or user story for {project_name} and extract functional requirements.
+  expected_output: >
+    List of modules, flows, and business rules.
+
+test_scenarios:
+  description: >
+    Create high-level test scenarios from the BRD.
+  expected_output: >
+    Scenario list with IDs and descriptions.
+
+detailed_testcases:
+  description: >
+    Write step-by-step test cases with test data and expected results.
+  expected_output: >
+    Test case table.
+
+edge_case_review:
+  description: >
+    Identify negative, edge, and boundary test cases.
+  expected_output: >
+    Edge case list.
+
+automation_candidates:
+  description: >
+    Suggest test cases suitable for automation.
+  expected_output: >
+    Automation-ready test list.
