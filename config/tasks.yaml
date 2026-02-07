@@ -1,29 +1,84 @@
 brd_analysis:
   description: >
-    Analyze the BRD or user story for {project_name} and extract functional requirements.
+    Analyze the BRD for {project_name}.
+
+    Extract functional requirements as a STRICT JSON ARRAY.
+
+    Each object must contain:
+    - module
+    - description
+
+    RULES:
+    - Output ONLY JSON
+    - Must start with [
+    - Must end with ]
   expected_output: >
-    List of modules, flows, and business rules.
+    JSON array of modules and descriptions.
 
 test_scenarios:
   description: >
-    Create high-level test scenarios from the BRD.
+    From BRD analysis, create test scenarios as a STRICT JSON ARRAY.
+
+    Each object must contain:
+    - id
+    - description
+
+    RULES:
+    - Output ONLY JSON
   expected_output: >
-    Scenario list with IDs and descriptions.
+    JSON array of scenarios.
 
 detailed_testcases:
   description: >
-    Write step-by-step test cases with test data and expected results.
-  expected_output: >
-    Test case table.
+    Generate detailed test cases in pure JSON array.
+    Each object must have:
+
+    id, scenario, steps, expected_result, test_type
+
+    IMPORTANT:
+    - steps MUST be a JSON LIST of strings
+    - NOT a single sentence
+    - NOT concatenated text
+
+    Example:
+    [
+      {
+        "id": "TC-01",
+        "scenario": "Valid login",
+        "steps": [
+          "Enter valid username",
+          "Enter valid password",
+          "Click login",
+          "Verify dashboard is displayed"
+        ],
+        "expected_result": "User logs in successfully",
+        "test_type": "Positive"
+      }
+    ]
+  expected_output: JSON
+
 
 edge_case_review:
   description: >
-    Identify negative, edge, and boundary test cases.
+    Identify edge, negative and boundary cases.
+
+    Return STRICT JSON ARRAY of strings.
+
+    RULES:
+    - Output ONLY JSON
   expected_output: >
-    Edge case list.
+    JSON array.
 
 automation_candidates:
   description: >
-    Suggest test cases suitable for automation.
+    Suggest automation candidates.
+
+    Return STRICT JSON ARRAY of objects:
+
+    - id
+    - reason
+
+    RULES:
+    - Output ONLY JSON
   expected_output: >
-    Automation-ready test list.
+    JSON array.
