@@ -1,8 +1,19 @@
 streamlit==1.31.1
+
+# CrewAI core
 crewai==1.9.3
-python-dotenv>=1.1.1,<1.2
-openpyxl~=3.1.5
-pdfplumber~=0.11.4
 litellm==1.43.12
 together==1.2.3
+
+# Required versions to satisfy CrewAI
 pydantic~=2.11.9
+openpyxl~=3.1.5
+pdfplumber~=0.11.4
+python-dotenv>=1.1.1,<1.2
+
+# 🔧 Fix protobuf war
+protobuf<5
+opentelemetry-api==1.22.0
+opentelemetry-sdk==1.22.0
+opentelemetry-exporter-otlp==1.22.0
+opentelemetry-proto==1.22.0
