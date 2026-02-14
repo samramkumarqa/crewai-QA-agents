@@ -8,6 +8,13 @@ import json, re
 import ast
 import os
 
+
+import os
+
+os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
+os.environ["OTEL_SDK_DISABLED"] = "true"
+os.environ["OPENTELEMETRY_SDK_DISABLED"] = "true"
+
 load_dotenv()
 
 llm = LLM(
