@@ -14,6 +14,7 @@ llm = LLM(
     model="together/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
     api_key=os.getenv("TOGETHER_API_KEY"),
     temperature=0.0,
+    is_litellm=True   # 🔥 force LiteLLM mode
 )
 
 
