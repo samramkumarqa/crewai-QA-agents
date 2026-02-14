@@ -1,7 +1,8 @@
 streamlit
-crewai
+crewai==0.35.8
+litellm
+together
 python-dotenv
 openpyxl
-together
 pypdf
 regex

@@ -6,16 +6,17 @@ from openpyxl import Workbook
 from datetime import datetime
 import json, re
 import ast
-
+import os
 
 load_dotenv()
 
 llm = LLM(
     model="together_ai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+    api_key=os.environ["TOGETHER_API_KEY"],
     temperature=0.0,
     max_tokens=1500,
-    request_timeout=30
 )
+
 
 # ---------- Helpers ----------
 def parse_list_of_dicts(text):
