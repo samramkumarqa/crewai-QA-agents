@@ -1,0 +1,7 @@
+streamlit
+crewai
+python-dotenv
+openpyxl
+together
+pypdf
+regex

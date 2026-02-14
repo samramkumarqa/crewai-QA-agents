@@ -1,80 +1,67 @@
-from typing import List
+# qa_engine.py
 from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import CrewBase, agent, crew, task
 from dotenv import load_dotenv
 from openpyxl import Workbook
 from datetime import datetime
 import json, re
+import ast
+
 
 load_dotenv()
 
 llm = LLM(
     model="together_ai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-    temperature=0.3,
+    temperature=0.0,
     max_tokens=1500,
     request_timeout=30
 )
 
-# ---------- Normalise Edge ----------
+# ---------- Helpers ----------
+def parse_list_of_dicts(text):
+    if isinstance(text, list):
+        return text
+    if not isinstance(text, str):
+        return []
+
+    try:
+        return ast.literal_eval(text)
+    except:
+        return []
+
+
+# ---------- Helpers ----------
 def normalize_edge(e):
     if isinstance(e, dict):
         return str(e.get("description", e))
     return str(e)
 
-# ---------- Normalise Steps ----------
 def normalize_steps(raw_steps):
     if not raw_steps:
         return ""
-
-    # If list
     if isinstance(raw_steps, list):
-        cleaned = []
-        for s in raw_steps:
-            if isinstance(s, dict):
-                cleaned.append(str(s.get("step", s)))
-            else:
-                cleaned.append(str(s))
-        return "\n".join(cleaned)
-
-    # If dict
+        return "\n".join(str(s.get("step", s)) if isinstance(s, dict) else str(s) for s in raw_steps)
     if isinstance(raw_steps, dict):
         return str(raw_steps.get("step", raw_steps))
-
-    # If string → try to split on sentence boundaries
     if isinstance(raw_steps, str):
-        # split before "User", "System", "Admin"
         parts = re.split(r'(?=(User|System|Administrator))', raw_steps)
-        merged = []
-        buffer = ""
+        merged, buf = [], ""
         for p in parts:
             if p in ["User", "System", "Administrator"]:
-                if buffer:
-                    merged.append(buffer.strip())
-                buffer = p
+                if buf: merged.append(buf.strip())
+                buf = p
             else:
-                buffer += p
-        if buffer:
-            merged.append(buffer.strip())
+                buf += p
+        if buf: merged.append(buf.strip())
+        return "\n".join(merged) if len(merged) > 1 else raw_steps
+    return str(raw_steps)
 
-        # If split worked
-        if len(merged) > 1:
-            return "\n".join(merged)
-
-        return raw_steps
-
-    return str(raw_steps)    
-
-# ---------- Normalise List ----------
 def normalize_list(data):
-    if not data:
-        return []
-    if isinstance(data, (dict, str)):
-        return [data]
-    if isinstance(data, list):
-        return data
+    if not data: return []
+    if isinstance(data, (dict, str)): return [data]
+    if isinstance(data, list): return data
     return [str(data)]
 
-# ---------- JSON Safe ----------
 def safe_json(text):
     try:
         return json.loads(text)
@@ -87,9 +74,8 @@ def safe_json(text):
                 return []
         return []
 
-# ---------- Excel Export ----------
+# ---------- Excel ----------
 def export_excel(brd, scenarios, tcs, edges, auto):
-
     brd = normalize_list(brd)
     scenarios = normalize_list(scenarios)
     tcs = normalize_list(tcs)
@@ -97,27 +83,26 @@ def export_excel(brd, scenarios, tcs, edges, auto):
     auto = normalize_list(auto)
 
     wb = Workbook()
-
-    # --- BRD ---
     ws1 = wb.active
     ws1.title = "BRD Analysis"
     ws1.append(["Module", "Description"])
+    brd_rows = []
     for r in brd:
-        if isinstance(r, dict):
-            ws1.append([r.get("module",""), r.get("description","")])
-        else:
-            ws1.append(["", str(r)])
+        if isinstance(r, str) and r.strip().startswith("["):
+            brd_rows.extend(parse_list_of_dicts(r))
+        elif isinstance(r, dict):
+            brd_rows.append(r)
 
-    # --- Scenarios ---
+    for r in brd_rows:
+        ws1.append([r.get("module",""), r.get("description","")])
+
+
+
     ws2 = wb.create_sheet("Test Scenarios")
     ws2.append(["ID", "Description"])
     for s in scenarios:
-        if isinstance(s, dict):
-            ws2.append([s.get("id",""), s.get("description","")])
-        else:
-            ws2.append(["", str(s)])
+        ws2.append([s.get("id",""), s.get("description","")]) if isinstance(s, dict) else ws2.append(["", str(s)])
 
-    # --- Detailed Test Cases ---
     ws3 = wb.create_sheet("Detailed Test Cases")
     ws3.append(["ID", "Scenario", "Steps", "Expected Result", "Type"])
     for t in tcs:
@@ -132,24 +117,33 @@ def export_excel(brd, scenarios, tcs, edges, auto):
         else:
             ws3.append(["", str(t), "", "", ""])
 
-    # --- Edge Cases ---
     ws4 = wb.create_sheet("Edge Cases")
-    ws4.append(["Edge Case"])
-    for e in edges:
-        ws4.append([normalize_edge(e)])
+    ws4.append(["ID", "Scenario", "Steps", "Expected Result"])
 
-    # --- Automation ---
+    edge_rows = []
+    for e in edges:
+        if isinstance(e, str) and e.strip().startswith("["):
+            edge_rows.extend(parse_list_of_dicts(e))
+        elif isinstance(e, dict):
+            edge_rows.append(e)
+
+    for e in edge_rows:
+        ws4.append([
+            e.get("id",""),
+            e.get("scenario",""),
+            normalize_steps(e.get("steps")),
+            e.get("expected_result","")
+        ])
+
+
     ws5 = wb.create_sheet("Automation Candidates")
     ws5.append(["ID", "Reason"])
     for a in auto:
-        if isinstance(a, dict):
-            ws5.append([a.get("id",""), a.get("reason","")])
-        else:
-            ws5.append(["", str(a)])
+        ws5.append([a.get("id",""), a.get("reason","")]) if isinstance(a, dict) else ws5.append(["", str(a)])
 
     name = f"QA_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     wb.save(name)
-    print("✅ Excel generated:", name)
+    return name
 
 # ---------- Crew ----------
 @CrewBase
@@ -186,40 +180,4 @@ class QACrew():
 
     @crew
     def qacrew(self):
-        return Crew(
-            agents=self.agents,
-            tasks=self.tasks,
-            process=Process.sequential,
-            verbose=True
-        )
-
-# ---------- Run ----------
-if __name__ == "__main__":
-    inputs = {
-        "project_name": "Banking Login Module",
-        "brd_text": """
-        User logs in using username and password.
-        System locks account after 3 failures.
-        Forgot password sends reset link.
-        """
-    }
-
-    crew = QACrew().qacrew()
-    crew.kickoff(inputs=inputs)
-
-    brd = scenarios = tcs = edges = auto = []
-
-    for t in crew.tasks:
-        raw = t.output.raw if hasattr(t.output, "raw") else ""
-        if t.name == "brd_analysis":
-            brd = safe_json(raw)
-        elif t.name == "test_scenarios":
-            scenarios = safe_json(raw)
-        elif t.name == "detailed_testcases":
-            tcs = safe_json(raw)
-        elif t.name == "edge_case_review":
-            edges = safe_json(raw)
-        elif t.name == "automation_candidates":
-            auto = safe_json(raw)
-
-    export_excel(brd, scenarios, tcs, edges, auto)
+        return Crew(agents=self.agents, tasks=self.tasks, process=Process.sequential, verbose=True)
