@@ -1,9 +1,15 @@
 # qa_engine.py
+import os
+os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
+os.environ["OTEL_SDK_DISABLED"] = "true"
+os.environ["OPENTELEMETRY_SDK_DISABLED"] = "true"
+
 from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import CrewBase, agent, crew, task
 from dotenv import load_dotenv
 from openpyxl import Workbook
 from datetime import datetime
+from openpyxl.styles import Alignment
 import json, re
 import ast
 import os
@@ -18,10 +24,11 @@ os.environ["OPENTELEMETRY_SDK_DISABLED"] = "true"
 load_dotenv()
 
 llm = LLM(
-    model="together/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+    model="together_ai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
     api_key=os.getenv("TOGETHER_API_KEY"),
     temperature=0.0,
-    is_litellm=True   # 🔥 force LiteLLM mode
+    max_tokens=1500,
+    request_timeout=30
 )
 
 
@@ -44,25 +51,34 @@ def normalize_edge(e):
         return str(e.get("description", e))
     return str(e)
 
+def format_steps(steps):
+    if isinstance(steps, list):
+        return "\n".join([f"{i+1}. {s}" for i, s in enumerate(steps)])
+    return str(steps)
+
 def normalize_steps(raw_steps):
     if not raw_steps:
         return ""
+
+    # If already list → number & line break
     if isinstance(raw_steps, list):
-        return "\n".join(str(s.get("step", s)) if isinstance(s, dict) else str(s) for s in raw_steps)
+        return "\n".join([f"{i+1}. {s.get('step', s) if isinstance(s, dict) else s}"
+                          for i, s in enumerate(raw_steps)])
+
+    # If dict
     if isinstance(raw_steps, dict):
-        return str(raw_steps.get("step", raw_steps))
+        return f"1. {raw_steps.get('step', raw_steps)}"
+
+    # If string → split by common action verbs
     if isinstance(raw_steps, str):
-        parts = re.split(r'(?=(User|System|Administrator))', raw_steps)
-        merged, buf = [], ""
-        for p in parts:
-            if p in ["User", "System", "Administrator"]:
-                if buf: merged.append(buf.strip())
-                buf = p
-            else:
-                buf += p
-        if buf: merged.append(buf.strip())
-        return "\n".join(merged) if len(merged) > 1 else raw_steps
+        parts = re.split(r'(?=Enter |Click |Verify |Select |Login |Log in |Open |Submit )', raw_steps)
+        parts = [p.strip() for p in parts if p.strip()]
+        if len(parts) > 1:
+            return "\n".join([f"{i+1}. {p}" for i, p in enumerate(parts)])
+        return raw_steps
+
     return str(raw_steps)
+
 
 def normalize_list(data):
     if not data: return []
@@ -149,7 +165,25 @@ def export_excel(brd, scenarios, tcs, edges, auto):
     for a in auto:
         ws5.append([a.get("id",""), a.get("reason","")]) if isinstance(a, dict) else ws5.append(["", str(a)])
 
+    for sheet in wb.worksheets:
+            for row in sheet.iter_rows():
+                for cell in row:
+                    cell.alignment = Alignment(wrap_text=True, vertical="top")
+
+    for ws in wb.worksheets:
+        for col in ws.columns:
+            max_len = 0
+            col_letter = col[0].column_letter
+            for cell in col:
+                try:
+                    max_len = max(max_len, len(str(cell.value)))
+                except:
+                    pass
+            ws.column_dimensions[col_letter].width = min(max_len + 3, 45)
+
+
     name = f"QA_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
     wb.save(name)
     return name
 

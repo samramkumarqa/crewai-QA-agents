@@ -1,9 +1,18 @@
+import os
+os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
+os.environ["OTEL_SDK_DISABLED"] = "true"
+os.environ["OPENTELEMETRY_SDK_DISABLED"] = "true"
+
 import streamlit as st
 import pdfplumber
 import os
 from qa_engine import QACrew, export_excel, normalize_list, safe_json
+from dotenv import load_dotenv
+load_dotenv()
 
-os.environ["TOGETHER_API_KEY"] = st.secrets["TOGETHER_API_KEY"]
+if not os.getenv("TOGETHER_API_KEY"):
+    st.error("TOGETHER_API_KEY not found in .env file")
+    st.stop()
 st.set_page_config(page_title="AI QA Generator", layout="centered")
 st.title("📄 AI BRD → Test Case Generator")
 
