@@ -1,5 +1,8 @@
 streamlit==1.31.1
-crewai==1.9.3
+
+# Downgrade CrewAI to protobuf-safe version
+crewai==0.51.0
+
 litellm==1.44.18
 together==0.2.8
 
@@ -7,6 +10,7 @@ python-dotenv>=1.1.1,<1.2
 pdfplumber~=0.11.4
 openpyxl~=3.1.5
 
+# Telemetry (protobuf <5 compatible)
 opentelemetry-api==1.27.0
 opentelemetry-sdk==1.27.0
 opentelemetry-exporter-otlp-proto-http==1.27.0
