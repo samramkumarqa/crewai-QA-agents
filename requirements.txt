@@ -2,8 +2,8 @@ streamlit==1.31.1
 crewai==1.9.3
 litellm==1.44.18
 together==0.2.8
-python-dotenv>=1.1.1,<1.2
+python-dotenv>=1.1.1
 pdfplumber~=0.11.4
 openpyxl~=3.1.5
-tiktoken==0.6.0
-protobuf>=3.20,<5
+tiktoken>=0.7.0
+protobuf<5,>=3.20
