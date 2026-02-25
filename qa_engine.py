@@ -1,3 +1,4 @@
+# qa_engine.py
 import os
 os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
 os.environ["OTEL_SDK_DISABLED"] = "true"
@@ -13,25 +14,24 @@ import json, re
 import ast
 import os
 
-# === CRITICAL FIX: Force LiteLLM to be available ===
+# === FIX: Properly initialize LiteLLM before CrewAI uses it ===
 import litellm
 import sys
-import types
 
-# Manually set the LiteLLM module in sys.modules if needed
-if 'litellm' not in sys.modules:
-    sys.modules['litellm'] = litellm
+# Ensure litellm is properly configured
+litellm.drop_params = True  # Set this explicitly
+litellm.set_verbose = False
 
-# Try to patch CrewAI's internal check
-try:
-    from crewai import llm as crewai_llm
-    crewai_llm.LITELLM_AVAILABLE = True
-except:
-    pass
+# Also set environment variables that LiteLLM might need
+os.environ["LITELLM_LOG"] = "ERROR"  # Reduce logging
 
-# Also try direct import to ensure it's loaded
-from litellm import completion
-# ==================================================
+# Optional: Configure LiteLLM for Together AI specifically
+litellm.together_ai = True
+
+# Force reload of litellm if needed
+import importlib
+importlib.reload(litellm)
+# ============================================================
 
 load_dotenv()
 
@@ -43,6 +43,7 @@ llm = LLM(
     request_timeout=30
 )
 
+# ... rest of your code (keep everything else the same)
 
 # ---------- Helpers ----------
 def parse_list_of_dicts(text):
