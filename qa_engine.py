@@ -1,80 +1,78 @@
-# qa_engine.py
+# qa_engine.py - GEMINI VERSION
 import os
 os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
 os.environ["OTEL_SDK_DISABLED"] = "true"
 os.environ["OPENTELEMETRY_SDK_DISABLED"] = "true"
 
 import sys
-import requests
 import json
 import re
 import ast
 from datetime import datetime
 
-from dotenv import load_dotenv
-from openpyxl import Workbook
-from openpyxl.styles import Alignment
-
 # Import CrewAI components
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 
+from dotenv import load_dotenv
+from openpyxl import Workbook
+from openpyxl.styles import Alignment
+
+# === GEMINI INTEGRATION (FREE) ===
+import google.generativeai as genai
+
 load_dotenv()
 
-# === DIRECT TOGETHER AI INTEGRATION ===
-class TogetherDirectLLM:
-    """Direct Together AI integration that bypasses LiteLLM entirely"""
+class GeminiDirectLLM:
+    """Direct Google Gemini integration - completely free tier"""
     
-    def __init__(self, api_key=None, model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"):
-        self.api_key = api_key or os.getenv("TOGETHER_API_KEY")
+    def __init__(self, api_key=None, model="gemini-1.5-flash"):
+        """
+        Initialize Gemini LLM
+        - gemini-1.5-flash: Fast, free tier (60 requests/min)
+        - gemini-1.5-pro: More powerful, also has free tier
+        """
+        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         if not self.api_key:
-            raise ValueError("TOGETHER_API_KEY is required")
+            raise ValueError("GEMINI_API_KEY is required. Get one from: https://aistudio.google.com/app/apikey")
         
-        self.model = model
-        self.base_url = "https://api.together.xyz/v1"
-        self.temperature = 0.0
-        self.max_tokens = 1500
+        # Configure Gemini
+        genai.configure(api_key=self.api_key)
+        self.model = genai.GenerativeModel(model)
+        self.model_name = model
         
         # Print debug info
-        print(f"🔑 Using API key: {self.api_key[:10]}...{self.api_key[-10:]}")
-        print(f"🌐 Using endpoint: {self.base_url}")
-        print(f"🤖 Using model: {self.model}")
+        print(f"🔑 Gemini API key configured")
+        print(f"🤖 Using model: {self.model_name}")
+        
+        # Test the connection
+        try:
+            test_response = self.generate("Say 'Gemini is ready!' in one line.")
+            print(f"✅ Gemini test successful: {test_response}")
+        except Exception as e:
+            print(f"⚠️ Gemini test warning: {e}")
     
     def generate(self, prompt, **kwargs):
-        """Generate a response from Together AI"""
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "model": self.model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": kwargs.get("temperature", self.temperature),
-            "max_tokens": kwargs.get("max_tokens", self.max_tokens),
-            "top_p": kwargs.get("top_p", 0.7),
-            "top_k": kwargs.get("top_k", 50),
-            "repetition_penalty": kwargs.get("repetition_penalty", 1)
-        }
-        
+        """Generate a response from Gemini"""
         try:
-            response = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=30
+            # Set generation config
+            generation_config = {
+                "temperature": kwargs.get("temperature", 0.0),
+                "max_output_tokens": kwargs.get("max_tokens", 1500),
+                "top_p": kwargs.get("top_p", 0.8),
+                "top_k": kwargs.get("top_k", 40),
+            }
+            
+            # Generate response
+            response = self.model.generate_content(
+                prompt,
+                generation_config=generation_config
             )
             
-            if response.status_code == 200:
-                result = response.json()
-                return result["choices"][0]["message"]["content"]
-            else:
-                error_msg = f"Together AI error ({response.status_code}): {response.text}"
-                print(f"❌ {error_msg}")
-                raise Exception(error_msg)
-                
-        except requests.exceptions.RequestException as e:
-            print(f"❌ Request failed: {str(e)}")
+            return response.text
+            
+        except Exception as e:
+            print(f"❌ Gemini generation error: {str(e)}")
             raise
     
     def __call__(self, messages, **kwargs):
@@ -86,30 +84,29 @@ class TogetherDirectLLM:
                     prompt = msg.get("content", "")
                     break
             else:
+                # If no user message found, use the whole list
                 prompt = str(messages)
         else:
             prompt = str(messages)
         
         return self.generate(prompt, **kwargs)
 
-# Initialize the direct Together AI LLM
+# Initialize Gemini LLM
 try:
-    together_llm = TogetherDirectLLM()
-    print("✅ Direct Together AI integration successful!")
-    
-    # Test the connection
-    test_response = together_llm.generate("Say 'Hello, I am working!' in one word.")
-    print(f"✅ Test response: {test_response}")
-    
+    llm = GeminiDirectLLM()
+    print("✅ Google Gemini integration successful!")
 except Exception as e:
-    print(f"❌ Failed to initialize Together AI: {str(e)}")
+    print(f"❌ Failed to initialize Gemini: {str(e)}")
+    print("\n📝 To fix this:")
+    print("1. Go to https://aistudio.google.com/app/apikey")
+    print("2. Click 'Create API Key'")
+    print("3. Copy the key")
+    print("4. Add to Streamlit secrets: GEMINI_API_KEY = 'your-key-here'")
+    print("5. Or create .env file with: GEMINI_API_KEY=your-key-here")
     raise
-
-# We'll use this direct LLM with CrewAI by passing it as a callable
-llm = together_llm
 # ======================================
 
-# ---------- Helpers (unchanged) ----------
+# ---------- Helpers ----------
 def parse_list_of_dicts(text):
     if isinstance(text, list):
         return text
@@ -169,7 +166,7 @@ def safe_json(text):
                 return []
         return []
 
-# ---------- Excel (unchanged) ----------
+# ---------- Excel ----------
 def export_excel(brd, scenarios, tcs, edges, auto):
     brd = normalize_list(brd)
     scenarios = normalize_list(scenarios)
@@ -253,7 +250,7 @@ def export_excel(brd, scenarios, tcs, edges, auto):
     wb.save(name)
     return name
 
-# ---------- Crew (unchanged but using our direct LLM) ----------
+# ---------- Crew ----------
 @CrewBase
 class QACrew():
     agents_config = "config/agents.yaml"
@@ -261,19 +258,39 @@ class QACrew():
 
     @agent
     def lead_qa(self): 
-        return Agent(config=self.agents_config["lead_qa"], llm=llm, verbose=True)
+        return Agent(
+            config=self.agents_config["lead_qa"], 
+            llm=llm,
+            verbose=True,
+            allow_delegation=False
+        )
 
     @agent
     def scenario_designer(self): 
-        return Agent(config=self.agents_config["scenario_designer"], llm=llm, verbose=True)
+        return Agent(
+            config=self.agents_config["scenario_designer"], 
+            llm=llm,
+            verbose=True,
+            allow_delegation=False
+        )
 
     @agent
     def testcase_writer(self): 
-        return Agent(config=self.agents_config["testcase_writer"], llm=llm, verbose=True)
+        return Agent(
+            config=self.agents_config["testcase_writer"], 
+            llm=llm,
+            verbose=True,
+            allow_delegation=False
+        )
 
     @agent
     def qa_reviewer(self): 
-        return Agent(config=self.agents_config["qa_reviewer"], llm=llm, verbose=True)
+        return Agent(
+            config=self.agents_config["qa_reviewer"], 
+            llm=llm,
+            verbose=True,
+            allow_delegation=False
+        )
 
     @task
     def brd_analysis(self): 
@@ -297,4 +314,11 @@ class QACrew():
 
     @crew
     def qacrew(self):
-        return Crew(agents=self.agents, tasks=self.tasks, process=Process.sequential, verbose=True)
+        return Crew(
+            agents=self.agents, 
+            tasks=self.tasks, 
+            process=Process.sequential, 
+            verbose=True,
+            memory=False,
+            cache=False
+        )
