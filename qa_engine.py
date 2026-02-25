@@ -29,6 +29,23 @@ litellm.gemini_key = os.getenv("GEMINI_API_KEY")
 litellm.gemini_api_key = os.getenv("GEMINI_API_KEY")
 # ===================================================
 
+# === DEBUG: List available Gemini models ===
+try:
+    from google import genai
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    if GEMINI_API_KEY:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        print("📋 Available Gemini models:")
+        for model in client.models.list():
+            if "generateContent" in str(model.supported_actions):
+                print(f"  - {model.name}")
+        print("=" * 50)
+    else:
+        print("❌ GEMINI_API_KEY not found")
+except Exception as e:
+    print(f"⚠️ Could not list models: {e}")
+# ============================================
+
 load_dotenv()
 
 # Get API key
