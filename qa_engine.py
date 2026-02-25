@@ -18,6 +18,17 @@ from dotenv import load_dotenv
 from openpyxl import Workbook
 from openpyxl.styles import Alignment
 
+# === FIX: Ensure LiteLLM is properly initialized ===
+import litellm
+litellm.drop_params = True
+litellm.set_verbose = False
+litellm.suppress_debug_info = True
+
+# Force LiteLLM to recognize Gemini
+litellm.gemini_key = os.getenv("GEMINI_API_KEY")
+litellm.gemini_api_key = os.getenv("GEMINI_API_KEY")
+# ===================================================
+
 load_dotenv()
 
 # Get API key
@@ -25,18 +36,21 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY is required. Get one from: https://aistudio.google.com/app/apikey")
 
-# Use CrewAI's official LLM class with Gemini
-# CrewAI has native support for Gemini when crewai[google-genai] is installed
+# Use LiteLLM's Gemini format directly
 llm = LLM(
-    model="models/gemini-1.5-flash",  # Correct model path for Gemini API
+    model="gemini/gemini-1.5-flash",  # LiteLLM format: provider/model
     api_key=GEMINI_API_KEY,
     temperature=0.0,
     max_tokens=1500,
     request_timeout=30,
+    # These parameters help with LiteLLM routing
+    custom_llm_provider="gemini",
+    num_retries=2,
 )
 
-print(f"✅ CrewAI LLM configured with Gemini")
-print(f"🤖 Using model: models/gemini-1.5-flash")
+print(f"✅ CrewAI LLM configured with Gemini via LiteLLM")
+print(f"🤖 Using model: gemini/gemini-1.5-flash")
+print(f"🔑 API key length: {len(GEMINI_API_KEY)}")
 
 # ---------- Helpers (keep all your existing helper functions) ----------
 def parse_list_of_dicts(text):
