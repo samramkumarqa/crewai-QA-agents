@@ -4,36 +4,47 @@ os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
 os.environ["OTEL_SDK_DISABLED"] = "true"
 os.environ["OPENTELEMETRY_SDK_DISABLED"] = "true"
 
+# === CRITICAL: Monkey Patch CrewAI's LLM class BEFORE importing ===
+import sys
+import types
+
+# First, ensure litellm is imported and available
+import litellm
+litellm.drop_params = True
+
+# Now monkey patch CrewAI's llm module
+try:
+    # Create a mock module if needed
+    if 'crewai.llm' in sys.modules:
+        crewai_llm = sys.modules['crewai.llm']
+    else:
+        # Import it to patch it
+        from crewai import llm as crewai_llm
+    
+    # Force LITELLM_AVAILABLE to True
+    crewai_llm.LITELLM_AVAILABLE = True
+    print("✅ Successfully patched CrewAI LITELLM_AVAILABLE")
+except Exception as e:
+    print(f"⚠️ Patch warning: {e}")
+    pass
+
+# Now import the rest of CrewAI
 from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import CrewBase, agent, crew, task
+# ============================================================
+
 from dotenv import load_dotenv
 from openpyxl import Workbook
 from datetime import datetime
 from openpyxl.styles import Alignment
 import json, re
 import ast
-import os
-
-# === FIX: Properly initialize LiteLLM before CrewAI uses it ===
-import litellm
-import sys
-
-# Ensure litellm is properly configured
-litellm.drop_params = True  # Set this explicitly
-litellm.set_verbose = False
-
-# Also set environment variables that LiteLLM might need
-os.environ["LITELLM_LOG"] = "ERROR"  # Reduce logging
-
-# Optional: Configure LiteLLM for Together AI specifically
-litellm.together_ai = True
-
-# Force reload of litellm if needed
-import importlib
-importlib.reload(litellm)
-# ============================================================
 
 load_dotenv()
+
+# Verify litellm is working
+print(f"LiteLLM version: {litellm.__version__}")
+print(f"LiteLLM drop_params: {litellm.drop_params}")
 
 llm = LLM(
     model="together_ai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
@@ -42,6 +53,8 @@ llm = LLM(
     max_tokens=1500,
     request_timeout=30
 )
+
+# ... rest of your code (keep all your existing functions and classes)
 
 # ... rest of your code (keep everything else the same)
 
