@@ -29,33 +29,18 @@ litellm.gemini_key = os.getenv("GEMINI_API_KEY")
 litellm.gemini_api_key = os.getenv("GEMINI_API_KEY")
 # ===================================================
 
-# === DEBUG: List available Gemini models ===
-try:
-    from google import genai
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-    if GEMINI_API_KEY:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        print("📋 Available Gemini models:")
-        for model in client.models.list():
-            if "generateContent" in str(model.supported_actions):
-                print(f"  - {model.name}")
-        print("=" * 50)
-    else:
-        print("❌ GEMINI_API_KEY not found")
-except Exception as e:
-    print(f"⚠️ Could not list models: {e}")
-# ============================================
 
 load_dotenv()
+# In qa_engine.py, replace the LLM initialization with:
 
 # Get API key
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY is required. Get one from: https://aistudio.google.com/app/apikey")
 
-# Use the simplest model name format
+# Use an available model from the list (gemini-2.0-flash is a good choice)
 llm = LLM(
-    model="gemini-1.5-flash",  # Just the model name
+    model="models/gemini-2.0-flash",  # Available model from debug output
     api_key=GEMINI_API_KEY,
     temperature=0.0,
     max_tokens=1500,
@@ -63,7 +48,7 @@ llm = LLM(
 )
 
 print(f"✅ CrewAI LLM configured with Gemini")
-print(f"🤖 Using model: gemini-1.5-flash")
+print(f"🤖 Using model: models/gemini-2.0-flash")
 print(f"🔑 API key length: {len(GEMINI_API_KEY)}")
 
 # ---------- Helpers (keep all your existing helper functions) ----------
