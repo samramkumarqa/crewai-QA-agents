@@ -4,31 +4,45 @@ os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
 os.environ["OTEL_SDK_DISABLED"] = "true"
 os.environ["OPENTELEMETRY_SDK_DISABLED"] = "true"
 
-# === CRITICAL: Monkey Patch CrewAI's LLM class BEFORE importing ===
+# === COMPREHENSIVE FIX: Ensure litellm is properly initialized ===
 import sys
 import types
 
-# First, ensure litellm is imported and available
+# Import and configure litellm FIRST
 import litellm
+print(f"✅ LiteLLM imported, type: {type(litellm)}")
+
+# Set attributes directly on the module
 litellm.drop_params = True
+litellm.set_verbose = False
+litellm.suppress_debug_info = True
 
 # Now monkey patch CrewAI's llm module
 try:
-    # Create a mock module if needed
-    if 'crewai.llm' in sys.modules:
-        crewai_llm = sys.modules['crewai.llm']
-    else:
-        # Import it to patch it
-        from crewai import llm as crewai_llm
+    # Try to import and patch CrewAI's llm module
+    from crewai import llm as crewai_llm
     
     # Force LITELLM_AVAILABLE to True
     crewai_llm.LITELLM_AVAILABLE = True
     print("✅ Successfully patched CrewAI LITELLM_AVAILABLE")
+    
+    # Also patch the litellm reference in the module
+    if hasattr(crewai_llm, 'litellm'):
+        crewai_llm.litellm = litellm
+        print("✅ Patched litellm reference in crewai.llm")
+    
 except Exception as e:
-    print(f"⚠️ Patch warning: {e}")
+    print(f"⚠️ Initial patch warning: {e}")
+
+# Also try to patch the module before CrewAI fully loads
+try:
+    import crewai.llm
+    crewai.llm.litellm = litellm
+    print("✅ Patched crewai.llm.litellm directly")
+except:
     pass
 
-# Now import the rest of CrewAI
+# Import the rest of CrewAI
 from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import CrewBase, agent, crew, task
 # ============================================================
@@ -42,9 +56,8 @@ import ast
 
 load_dotenv()
 
-# Verify litellm is working - without version check
-print(f"✅ LiteLLM loaded successfully")
-print(f"LiteLLM drop_params: {litellm.drop_params}")
+# Final verification
+print(f"✅ Litellm drop_params is now: {litellm.drop_params}")
 
 llm = LLM(
     model="together_ai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
@@ -54,6 +67,7 @@ llm = LLM(
     request_timeout=30
 )
 
+# ... rest of your code (keep all your existing functions and classes)
 # ... rest of your code (keep all your existing functions and classes)
 
 # ... rest of your code (keep everything else the same)
