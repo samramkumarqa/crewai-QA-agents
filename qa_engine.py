@@ -18,9 +18,6 @@ from dotenv import load_dotenv
 from openpyxl import Workbook
 from openpyxl.styles import Alignment
 
-# === GEMINI INTEGRATION USING OFFICIAL CREWAI LLM ===
-import google.generativeai as genai
-
 load_dotenv()
 
 # Get API key
@@ -28,13 +25,10 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY is required. Get one from: https://aistudio.google.com/app/apikey")
 
-# Configure Gemini
-genai.configure(api_key=GEMINI_API_KEY)
-
 # Use CrewAI's official LLM class with Gemini
-# Note: CrewAI uses LiteLLM under the hood, which supports Gemini
+# CrewAI has native support for Gemini when crewai[google-genai] is installed
 llm = LLM(
-    model="gemini/gemini-1.5-flash",  # LiteLLM format for Gemini
+    model="gemini/gemini-1.5-flash",  # CrewAI/LiteLLM format for Gemini
     api_key=GEMINI_API_KEY,
     temperature=0.0,
     max_tokens=1500,
@@ -44,22 +38,12 @@ llm = LLM(
 print(f"✅ CrewAI LLM configured with Gemini")
 print(f"🤖 Using model: gemini-1.5-flash")
 
-# Test the connection (optional)
-try:
-    import litellm
-    litellm.set_verbose = False
-    print(f"✅ LiteLLM configured for Gemini")
-except Exception as e:
-    print(f"⚠️ LiteLLM warning: {e}")
-# ======================================
-
-# ---------- Helpers ----------
+# ---------- Helpers (keep all your existing helper functions) ----------
 def parse_list_of_dicts(text):
     if isinstance(text, list):
         return text
     if not isinstance(text, str):
         return []
-
     try:
         return ast.literal_eval(text)
     except:
@@ -78,21 +62,17 @@ def format_steps(steps):
 def normalize_steps(raw_steps):
     if not raw_steps:
         return ""
-
     if isinstance(raw_steps, list):
         return "\n".join([f"{i+1}. {s.get('step', s) if isinstance(s, dict) else s}"
                           for i, s in enumerate(raw_steps)])
-
     if isinstance(raw_steps, dict):
         return f"1. {raw_steps.get('step', raw_steps)}"
-
     if isinstance(raw_steps, str):
         parts = re.split(r'(?=Enter |Click |Verify |Select |Login |Log in |Open |Submit )', raw_steps)
         parts = [p.strip() for p in parts if p.strip()]
         if len(parts) > 1:
             return "\n".join([f"{i+1}. {p}" for i, p in enumerate(parts)])
         return raw_steps
-
     return str(raw_steps)
 
 def normalize_list(data):
