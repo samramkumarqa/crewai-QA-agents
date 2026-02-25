@@ -28,7 +28,7 @@ if not GEMINI_API_KEY:
 # Use CrewAI's official LLM class with Gemini
 # CrewAI has native support for Gemini when crewai[google-genai] is installed
 llm = LLM(
-    model="gemini/gemini-1.5-flash",  # CrewAI/LiteLLM format for Gemini
+    model="models/gemini-1.5-flash",  # Correct model path for Gemini API
     api_key=GEMINI_API_KEY,
     temperature=0.0,
     max_tokens=1500,
@@ -36,7 +36,7 @@ llm = LLM(
 )
 
 print(f"✅ CrewAI LLM configured with Gemini")
-print(f"🤖 Using model: gemini-1.5-flash")
+print(f"🤖 Using model: models/gemini-1.5-flash")
 
 # ---------- Helpers (keep all your existing helper functions) ----------
 def parse_list_of_dicts(text):
