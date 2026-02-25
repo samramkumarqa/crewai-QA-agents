@@ -42,8 +42,8 @@ import ast
 
 load_dotenv()
 
-# Verify litellm is working
-print(f"LiteLLM version: {litellm.__version__}")
+# Verify litellm is working - without version check
+print(f"✅ LiteLLM loaded successfully")
 print(f"LiteLLM drop_params: {litellm.drop_params}")
 
 llm = LLM(
