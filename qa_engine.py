@@ -36,20 +36,17 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY is required. Get one from: https://aistudio.google.com/app/apikey")
 
-# Use LiteLLM's Gemini format directly
+# Use the simplest model name format
 llm = LLM(
-    model="gemini/gemini-1.5-flash",  # LiteLLM format: provider/model
+    model="gemini-1.5-flash",  # Just the model name
     api_key=GEMINI_API_KEY,
     temperature=0.0,
     max_tokens=1500,
     request_timeout=30,
-    # These parameters help with LiteLLM routing
-    custom_llm_provider="gemini",
-    num_retries=2,
 )
 
-print(f"✅ CrewAI LLM configured with Gemini via LiteLLM")
-print(f"🤖 Using model: gemini/gemini-1.5-flash")
+print(f"✅ CrewAI LLM configured with Gemini")
+print(f"🤖 Using model: gemini-1.5-flash")
 print(f"🔑 API key length: {len(GEMINI_API_KEY)}")
 
 # ---------- Helpers (keep all your existing helper functions) ----------
