@@ -10,6 +10,14 @@ import pdfplumber
 from qa_engine import QACrew, export_excel, normalize_list, safe_json
 from dotenv import load_dotenv
 
+# === DEBUG: Check LiteLLM ===
+try:
+    import litellm
+    st.sidebar.success(f"✅ LiteLLM version: {litellm.__version__}")
+except ImportError as e:
+    st.sidebar.error(f"❌ LiteLLM import failed: {str(e)}")
+# =============================
+
 # Load .env for local
 load_dotenv()
 

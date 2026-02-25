@@ -14,8 +14,18 @@ import json, re
 import ast
 import os
 
+# === CRITICAL FIX: Import and initialize LiteLLM ===
+try:
+    import litellm
+    litellm.set_verbose = False  # Optional: reduce logging
+    # Configure LiteLLM to work with Together AI
+    litellm.together_ai = True
+except ImportError as e:
+    print(f"⚠️ LiteLLM import warning: {e}")
+    # This shouldn't happen if litellm is in requirements.txt
+    pass
+# ==================================================
 
-import os
 
 os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
 os.environ["OTEL_SDK_DISABLED"] = "true"
