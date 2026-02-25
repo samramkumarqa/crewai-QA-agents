@@ -1,4 +1,4 @@
-streamlit==1.31.1
+streamlit==1.54.0
 crewai==1.9.3
 litellm==1.44.18
 together==0.2.8
