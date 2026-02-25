@@ -1,4 +1,4 @@
-# qa_engine.py - GEMINI VERSION
+# qa_engine.py
 import os
 os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
 os.environ["OTEL_SDK_DISABLED"] = "true"
@@ -11,99 +11,46 @@ import ast
 from datetime import datetime
 
 # Import CrewAI components
-from crewai import Agent, Crew, Process, Task
+from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import CrewBase, agent, crew, task
 
 from dotenv import load_dotenv
 from openpyxl import Workbook
 from openpyxl.styles import Alignment
 
-# === GEMINI INTEGRATION (FREE) ===
+# === GEMINI INTEGRATION USING OFFICIAL CREWAI LLM ===
 import google.generativeai as genai
 
 load_dotenv()
 
-class GeminiDirectLLM:
-    """Direct Google Gemini integration - completely free tier"""
-    
-    def __init__(self, api_key=None, model="gemini-1.5-flash"):
-        """
-        Initialize Gemini LLM
-        - gemini-1.5-flash: Fast, free tier (60 requests/min)
-        - gemini-1.5-pro: More powerful, also has free tier
-        """
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        if not self.api_key:
-            raise ValueError("GEMINI_API_KEY is required. Get one from: https://aistudio.google.com/app/apikey")
-        
-        # Configure Gemini
-        genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel(model)
-        self.model_name = model
-        
-        # Print debug info
-        print(f"🔑 Gemini API key configured")
-        print(f"🤖 Using model: {self.model_name}")
-        
-        # Test the connection
-        try:
-            test_response = self.generate("Say 'Gemini is ready!' in one line.")
-            print(f"✅ Gemini test successful: {test_response}")
-        except Exception as e:
-            print(f"⚠️ Gemini test warning: {e}")
-    
-    def generate(self, prompt, **kwargs):
-        """Generate a response from Gemini"""
-        try:
-            # Set generation config
-            generation_config = {
-                "temperature": kwargs.get("temperature", 0.0),
-                "max_output_tokens": kwargs.get("max_tokens", 1500),
-                "top_p": kwargs.get("top_p", 0.8),
-                "top_k": kwargs.get("top_k", 40),
-            }
-            
-            # Generate response
-            response = self.model.generate_content(
-                prompt,
-                generation_config=generation_config
-            )
-            
-            return response.text
-            
-        except Exception as e:
-            print(f"❌ Gemini generation error: {str(e)}")
-            raise
-    
-    def __call__(self, messages, **kwargs):
-        """Make the LLM callable like CrewAI expects"""
-        if isinstance(messages, list):
-            # Extract the last user message
-            for msg in reversed(messages):
-                if isinstance(msg, dict) and msg.get("role") == "user":
-                    prompt = msg.get("content", "")
-                    break
-            else:
-                # If no user message found, use the whole list
-                prompt = str(messages)
-        else:
-            prompt = str(messages)
-        
-        return self.generate(prompt, **kwargs)
+# Get API key
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise ValueError("GEMINI_API_KEY is required. Get one from: https://aistudio.google.com/app/apikey")
 
-# Initialize Gemini LLM
+# Configure Gemini
+genai.configure(api_key=GEMINI_API_KEY)
+
+# Use CrewAI's official LLM class with Gemini
+# Note: CrewAI uses LiteLLM under the hood, which supports Gemini
+llm = LLM(
+    model="gemini/gemini-1.5-flash",  # LiteLLM format for Gemini
+    api_key=GEMINI_API_KEY,
+    temperature=0.0,
+    max_tokens=1500,
+    request_timeout=30,
+)
+
+print(f"✅ CrewAI LLM configured with Gemini")
+print(f"🤖 Using model: gemini-1.5-flash")
+
+# Test the connection (optional)
 try:
-    llm = GeminiDirectLLM()
-    print("✅ Google Gemini integration successful!")
+    import litellm
+    litellm.set_verbose = False
+    print(f"✅ LiteLLM configured for Gemini")
 except Exception as e:
-    print(f"❌ Failed to initialize Gemini: {str(e)}")
-    print("\n📝 To fix this:")
-    print("1. Go to https://aistudio.google.com/app/apikey")
-    print("2. Click 'Create API Key'")
-    print("3. Copy the key")
-    print("4. Add to Streamlit secrets: GEMINI_API_KEY = 'your-key-here'")
-    print("5. Or create .env file with: GEMINI_API_KEY=your-key-here")
-    raise
+    print(f"⚠️ LiteLLM warning: {e}")
 # ======================================
 
 # ---------- Helpers ----------
@@ -294,23 +241,38 @@ class QACrew():
 
     @task
     def brd_analysis(self): 
-        return Task(config=self.tasks_config["brd_analysis"], agent=self.lead_qa())
+        return Task(
+            config=self.tasks_config["brd_analysis"], 
+            agent=self.lead_qa()
+        )
 
     @task
     def test_scenarios(self): 
-        return Task(config=self.tasks_config["test_scenarios"], agent=self.scenario_designer())
+        return Task(
+            config=self.tasks_config["test_scenarios"], 
+            agent=self.scenario_designer()
+        )
 
     @task
     def detailed_testcases(self): 
-        return Task(config=self.tasks_config["detailed_testcases"], agent=self.testcase_writer())
+        return Task(
+            config=self.tasks_config["detailed_testcases"], 
+            agent=self.testcase_writer()
+        )
 
     @task
     def edge_case_review(self): 
-        return Task(config=self.tasks_config["edge_case_review"], agent=self.qa_reviewer())
+        return Task(
+            config=self.tasks_config["edge_case_review"], 
+            agent=self.qa_reviewer()
+        )
 
     @task
     def automation_candidates(self): 
-        return Task(config=self.tasks_config["automation_candidates"], agent=self.qa_reviewer())
+        return Task(
+            config=self.tasks_config["automation_candidates"], 
+            agent=self.qa_reviewer()
+        )
 
     @crew
     def qacrew(self):
