@@ -1,4 +1,3 @@
-# qa_engine.py
 import os
 os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
 os.environ["OTEL_SDK_DISABLED"] = "true"
@@ -14,22 +13,25 @@ import json, re
 import ast
 import os
 
-# === CRITICAL FIX: Import and initialize LiteLLM ===
+# === CRITICAL FIX: Force LiteLLM to be available ===
+import litellm
+import sys
+import types
+
+# Manually set the LiteLLM module in sys.modules if needed
+if 'litellm' not in sys.modules:
+    sys.modules['litellm'] = litellm
+
+# Try to patch CrewAI's internal check
 try:
-    import litellm
-    litellm.set_verbose = False  # Optional: reduce logging
-    # Configure LiteLLM to work with Together AI
-    litellm.together_ai = True
-except ImportError as e:
-    print(f"⚠️ LiteLLM import warning: {e}")
-    # This shouldn't happen if litellm is in requirements.txt
+    from crewai import llm as crewai_llm
+    crewai_llm.LITELLM_AVAILABLE = True
+except:
     pass
+
+# Also try direct import to ensure it's loaded
+from litellm import completion
 # ==================================================
-
-
-os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
-os.environ["OTEL_SDK_DISABLED"] = "true"
-os.environ["OPENTELEMETRY_SDK_DISABLED"] = "true"
 
 load_dotenv()
 
