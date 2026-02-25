@@ -11,45 +11,74 @@ import ast
 from datetime import datetime
 
 # Import CrewAI components
-from crewai import Agent, Crew, Process, Task, LLM
+from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 
 from dotenv import load_dotenv
 from openpyxl import Workbook
 from openpyxl.styles import Alignment
 
-# === FIX: Ensure LiteLLM is properly initialized ===
+# === CRITICAL: Initialize LiteLLM properly ===
 import litellm
 litellm.drop_params = True
 litellm.set_verbose = False
 litellm.suppress_debug_info = True
 
-# Force LiteLLM to recognize Gemini
-litellm.gemini_key = os.getenv("GEMINI_API_KEY")
-litellm.gemini_api_key = os.getenv("GEMINI_API_KEY")
-# ===================================================
-
+# Set environment variables for LiteLLM
+os.environ["LITELLM_LOG"] = "ERROR"
+# ============================================
 
 load_dotenv()
-# In qa_engine.py, replace the LLM initialization with:
 
 # Get API key
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY is required. Get one from: https://aistudio.google.com/app/apikey")
 
-# Use an available model from the list (gemini-2.0-flash is a good choice)
-llm = LLM(
-    model="models/gemini-2.0-flash",  # Available model from debug output
-    api_key=GEMINI_API_KEY,
-    temperature=0.0,
-    max_tokens=1500,
-    request_timeout=30,
-)
+# Set Gemini API key in environment for LiteLLM
+os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
 
-print(f"✅ CrewAI LLM configured with Gemini")
-print(f"🤖 Using model: models/gemini-2.0-flash")
-print(f"🔑 API key length: {len(GEMINI_API_KEY)}")
+# Use a simple callable LLM function instead of CrewAI's LLM class
+def gemini_llm(messages, **kwargs):
+    """Direct Gemini API call using LiteLLM"""
+    try:
+        # Extract the prompt from messages
+        if isinstance(messages, list):
+            for msg in reversed(messages):
+                if isinstance(msg, dict) and msg.get("role") == "user":
+                    prompt = msg.get("content", "")
+                    break
+            else:
+                prompt = str(messages)
+        else:
+            prompt = str(messages)
+        
+        # Use LiteLLM to call Gemini
+        response = litellm.completion(
+            model="gemini/gemini-2.0-flash",  # LiteLLM format
+            messages=[{"role": "user", "content": prompt}],
+            api_key=GEMINI_API_KEY,
+            temperature=kwargs.get("temperature", 0.0),
+            max_tokens=kwargs.get("max_tokens", 1500),
+        )
+        
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"❌ Gemini API error: {e}")
+        raise
+
+# Test the connection
+try:
+    test_response = gemini_llm([{"role": "user", "content": "Say 'Gemini is ready!' in one line."}])
+    print(f"✅ Gemini test successful: {test_response}")
+    print(f"🤖 Using model: gemini-2.0-flash")
+    print(f"🔑 API key length: {len(GEMINI_API_KEY)}")
+except Exception as e:
+    print(f"❌ Gemini test failed: {e}")
+    raise
+
+# Use the callable function as the LLM for agents
+llm = gemini_llm
 
 # ---------- Helpers (keep all your existing helper functions) ----------
 def parse_list_of_dicts(text):
@@ -200,7 +229,7 @@ class QACrew():
     def lead_qa(self): 
         return Agent(
             config=self.agents_config["lead_qa"], 
-            llm=llm,
+            llm=llm,  # Use our callable function
             verbose=True,
             allow_delegation=False
         )
