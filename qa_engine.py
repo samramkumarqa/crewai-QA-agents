@@ -56,6 +56,11 @@ import ast
 
 load_dotenv()
 
+# Configure litellm for Together AI
+import litellm
+litellm.modify_params = True
+litellm.drop_params = True
+
 # Final verification
 print(f"✅ Litellm drop_params is now: {litellm.drop_params}")
 
@@ -64,12 +69,14 @@ llm = LLM(
     api_key=os.getenv("TOGETHER_API_KEY"),
     temperature=0.0,
     max_tokens=1500,
-    request_timeout=30
+    request_timeout=30,
+    # Add these parameters to fix function calling
+    custom_llm_provider="together_ai",
+    litellm_params={
+        "drop_params": True,
+        "together_ai": True
+    }
 )
-
-# ... rest of your code (keep all your existing functions and classes)
-# ... rest of your code (keep all your existing functions and classes)
-
 # ... rest of your code (keep everything else the same)
 
 # ---------- Helpers ----------
