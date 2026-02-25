@@ -10,12 +10,20 @@ import pdfplumber
 from qa_engine import QACrew, export_excel, normalize_list, safe_json
 from dotenv import load_dotenv
 
+# In app.py, around line 13-19, update to:
 # === DEBUG: Check LiteLLM ===
 try:
     import litellm
-    st.sidebar.success(f"✅ LiteLLM loaded successfully")
+    st.sidebar.success(f"✅ LiteLLM loaded")
     if hasattr(litellm, 'drop_params'):
         st.sidebar.info(f"✅ drop_params = {litellm.drop_params}")
+    # Check if API key is set
+    import os
+    api_key = os.getenv("TOGETHER_API_KEY") or st.secrets.get("TOGETHER_API_KEY", None)
+    if api_key:
+        st.sidebar.success(f"✅ API key found (length: {len(api_key)})")
+    else:
+        st.sidebar.error("❌ API key missing")
 except ImportError as e:
     st.sidebar.error(f"❌ LiteLLM import failed: {str(e)}")
 # =============================
