@@ -4,82 +4,112 @@ os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
 os.environ["OTEL_SDK_DISABLED"] = "true"
 os.environ["OPENTELEMETRY_SDK_DISABLED"] = "true"
 
-# === COMPREHENSIVE FIX: Ensure litellm is properly initialized ===
 import sys
-import types
-
-# Import and configure litellm FIRST
-import litellm
-print(f"✅ LiteLLM imported, type: {type(litellm)}")
-
-# Set attributes directly on the module
-litellm.drop_params = True
-litellm.set_verbose = False
-litellm.suppress_debug_info = True
-
-# Now monkey patch CrewAI's llm module
-try:
-    # Try to import and patch CrewAI's llm module
-    from crewai import llm as crewai_llm
-    
-    # Force LITELLM_AVAILABLE to True
-    crewai_llm.LITELLM_AVAILABLE = True
-    print("✅ Successfully patched CrewAI LITELLM_AVAILABLE")
-    
-    # Also patch the litellm reference in the module
-    if hasattr(crewai_llm, 'litellm'):
-        crewai_llm.litellm = litellm
-        print("✅ Patched litellm reference in crewai.llm")
-    
-except Exception as e:
-    print(f"⚠️ Initial patch warning: {e}")
-
-# Also try to patch the module before CrewAI fully loads
-try:
-    import crewai.llm
-    crewai.llm.litellm = litellm
-    print("✅ Patched crewai.llm.litellm directly")
-except:
-    pass
-
-# Import the rest of CrewAI
-from crewai import Agent, Crew, Process, Task, LLM
-from crewai.project import CrewBase, agent, crew, task
-# ============================================================
+import requests
+import json
+import re
+import ast
+from datetime import datetime
 
 from dotenv import load_dotenv
 from openpyxl import Workbook
-from datetime import datetime
 from openpyxl.styles import Alignment
-import json, re
-import ast
+
+# Import CrewAI components
+from crewai import Agent, Crew, Process, Task
+from crewai.project import CrewBase, agent, crew, task
 
 load_dotenv()
 
-# Configure litellm for Together AI
-import litellm
-litellm.modify_params = True
-litellm.drop_params = True
+# === DIRECT TOGETHER AI INTEGRATION ===
+class TogetherDirectLLM:
+    """Direct Together AI integration that bypasses LiteLLM entirely"""
+    
+    def __init__(self, api_key=None, model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"):
+        self.api_key = api_key or os.getenv("TOGETHER_API_KEY")
+        if not self.api_key:
+            raise ValueError("TOGETHER_API_KEY is required")
+        
+        self.model = model
+        self.base_url = "https://api.together.xyz/v1"
+        self.temperature = 0.0
+        self.max_tokens = 1500
+        
+        # Print debug info
+        print(f"🔑 Using API key: {self.api_key[:10]}...{self.api_key[-10:]}")
+        print(f"🌐 Using endpoint: {self.base_url}")
+        print(f"🤖 Using model: {self.model}")
+    
+    def generate(self, prompt, **kwargs):
+        """Generate a response from Together AI"""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": kwargs.get("temperature", self.temperature),
+            "max_tokens": kwargs.get("max_tokens", self.max_tokens),
+            "top_p": kwargs.get("top_p", 0.7),
+            "top_k": kwargs.get("top_k", 50),
+            "repetition_penalty": kwargs.get("repetition_penalty", 1)
+        }
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                return result["choices"][0]["message"]["content"]
+            else:
+                error_msg = f"Together AI error ({response.status_code}): {response.text}"
+                print(f"❌ {error_msg}")
+                raise Exception(error_msg)
+                
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Request failed: {str(e)}")
+            raise
+    
+    def __call__(self, messages, **kwargs):
+        """Make the LLM callable like CrewAI expects"""
+        if isinstance(messages, list):
+            # Extract the last user message
+            for msg in reversed(messages):
+                if isinstance(msg, dict) and msg.get("role") == "user":
+                    prompt = msg.get("content", "")
+                    break
+            else:
+                prompt = str(messages)
+        else:
+            prompt = str(messages)
+        
+        return self.generate(prompt, **kwargs)
 
-# Final verification
-print(f"✅ Litellm drop_params is now: {litellm.drop_params}")
+# Initialize the direct Together AI LLM
+try:
+    together_llm = TogetherDirectLLM()
+    print("✅ Direct Together AI integration successful!")
+    
+    # Test the connection
+    test_response = together_llm.generate("Say 'Hello, I am working!' in one word.")
+    print(f"✅ Test response: {test_response}")
+    
+except Exception as e:
+    print(f"❌ Failed to initialize Together AI: {str(e)}")
+    raise
 
-llm = LLM(
-    model="together_ai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-    api_key=os.getenv("TOGETHER_API_KEY"),
-    temperature=0.0,
-    max_tokens=1500,
-    request_timeout=30,
-    # Add these parameters to fix function calling
-    custom_llm_provider="together_ai",
-    litellm_params={
-        "drop_params": True,
-        "together_ai": True
-    }
-)
-# ... rest of your code (keep everything else the same)
+# We'll use this direct LLM with CrewAI by passing it as a callable
+llm = together_llm
+# ======================================
 
-# ---------- Helpers ----------
+# ---------- Helpers (unchanged) ----------
 def parse_list_of_dicts(text):
     if isinstance(text, list):
         return text
@@ -91,8 +121,6 @@ def parse_list_of_dicts(text):
     except:
         return []
 
-
-# ---------- Helpers ----------
 def normalize_edge(e):
     if isinstance(e, dict):
         return str(e.get("description", e))
@@ -107,16 +135,13 @@ def normalize_steps(raw_steps):
     if not raw_steps:
         return ""
 
-    # If already list → number & line break
     if isinstance(raw_steps, list):
         return "\n".join([f"{i+1}. {s.get('step', s) if isinstance(s, dict) else s}"
                           for i, s in enumerate(raw_steps)])
 
-    # If dict
     if isinstance(raw_steps, dict):
         return f"1. {raw_steps.get('step', raw_steps)}"
 
-    # If string → split by common action verbs
     if isinstance(raw_steps, str):
         parts = re.split(r'(?=Enter |Click |Verify |Select |Login |Log in |Open |Submit )', raw_steps)
         parts = [p.strip() for p in parts if p.strip()]
@@ -125,7 +150,6 @@ def normalize_steps(raw_steps):
         return raw_steps
 
     return str(raw_steps)
-
 
 def normalize_list(data):
     if not data: return []
@@ -145,7 +169,7 @@ def safe_json(text):
                 return []
         return []
 
-# ---------- Excel ----------
+# ---------- Excel (unchanged) ----------
 def export_excel(brd, scenarios, tcs, edges, auto):
     brd = normalize_list(brd)
     scenarios = normalize_list(scenarios)
@@ -166,8 +190,6 @@ def export_excel(brd, scenarios, tcs, edges, auto):
 
     for r in brd_rows:
         ws1.append([r.get("module",""), r.get("description","")])
-
-
 
     ws2 = wb.create_sheet("Test Scenarios")
     ws2.append(["ID", "Description"])
@@ -206,7 +228,6 @@ def export_excel(brd, scenarios, tcs, edges, auto):
             e.get("expected_result","")
         ])
 
-
     ws5 = wb.create_sheet("Automation Candidates")
     ws5.append(["ID", "Reason"])
     for a in auto:
@@ -228,44 +249,51 @@ def export_excel(brd, scenarios, tcs, edges, auto):
                     pass
             ws.column_dimensions[col_letter].width = min(max_len + 3, 45)
 
-
     name = f"QA_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-
     wb.save(name)
     return name
 
-# ---------- Crew ----------
+# ---------- Crew (unchanged but using our direct LLM) ----------
 @CrewBase
 class QACrew():
     agents_config = "config/agents.yaml"
     tasks_config = "config/tasks.yaml"
 
     @agent
-    def lead_qa(self): return Agent(config=self.agents_config["lead_qa"], llm=llm)
+    def lead_qa(self): 
+        return Agent(config=self.agents_config["lead_qa"], llm=llm, verbose=True)
 
     @agent
-    def scenario_designer(self): return Agent(config=self.agents_config["scenario_designer"], llm=llm)
+    def scenario_designer(self): 
+        return Agent(config=self.agents_config["scenario_designer"], llm=llm, verbose=True)
 
     @agent
-    def testcase_writer(self): return Agent(config=self.agents_config["testcase_writer"], llm=llm)
+    def testcase_writer(self): 
+        return Agent(config=self.agents_config["testcase_writer"], llm=llm, verbose=True)
 
     @agent
-    def qa_reviewer(self): return Agent(config=self.agents_config["qa_reviewer"], llm=llm)
+    def qa_reviewer(self): 
+        return Agent(config=self.agents_config["qa_reviewer"], llm=llm, verbose=True)
 
     @task
-    def brd_analysis(self): return Task(config=self.tasks_config["brd_analysis"], agent=self.lead_qa())
+    def brd_analysis(self): 
+        return Task(config=self.tasks_config["brd_analysis"], agent=self.lead_qa())
 
     @task
-    def test_scenarios(self): return Task(config=self.tasks_config["test_scenarios"], agent=self.scenario_designer())
+    def test_scenarios(self): 
+        return Task(config=self.tasks_config["test_scenarios"], agent=self.scenario_designer())
 
     @task
-    def detailed_testcases(self): return Task(config=self.tasks_config["detailed_testcases"], agent=self.testcase_writer())
+    def detailed_testcases(self): 
+        return Task(config=self.tasks_config["detailed_testcases"], agent=self.testcase_writer())
 
     @task
-    def edge_case_review(self): return Task(config=self.tasks_config["edge_case_review"], agent=self.qa_reviewer())
+    def edge_case_review(self): 
+        return Task(config=self.tasks_config["edge_case_review"], agent=self.qa_reviewer())
 
     @task
-    def automation_candidates(self): return Task(config=self.tasks_config["automation_candidates"], agent=self.qa_reviewer())
+    def automation_candidates(self): 
+        return Task(config=self.tasks_config["automation_candidates"], agent=self.qa_reviewer())
 
     @crew
     def qacrew(self):
