@@ -13,7 +13,9 @@ from dotenv import load_dotenv
 # === DEBUG: Check LiteLLM ===
 try:
     import litellm
-    st.sidebar.success(f"✅ LiteLLM version: {litellm.__version__}")
+    st.sidebar.success(f"✅ LiteLLM loaded successfully")
+    if hasattr(litellm, 'drop_params'):
+        st.sidebar.info(f"✅ drop_params = {litellm.drop_params}")
 except ImportError as e:
     st.sidebar.error(f"❌ LiteLLM import failed: {str(e)}")
 # =============================
