@@ -1,18 +1,28 @@
 import os
+
+# Disable telemetry & opentelemetry
 os.environ["CREWAI_TELEMETRY_ENABLED"] = "false"
 os.environ["OTEL_SDK_DISABLED"] = "true"
 os.environ["OPENTELEMETRY_SDK_DISABLED"] = "true"
 
 import streamlit as st
 import pdfplumber
-import os
 from qa_engine import QACrew, export_excel, normalize_list, safe_json
 from dotenv import load_dotenv
+
+# Load .env for local
 load_dotenv()
 
-if not os.getenv("TOGETHER_API_KEY"):
-    st.error("TOGETHER_API_KEY not found in .env file")
+# ---- API KEY LOADER (env OR streamlit secrets) ----
+api_key = os.getenv("TOGETHER_API_KEY") or st.secrets.get("TOGETHER_API_KEY", None)
+
+if not api_key:
+    st.error("❌ TOGETHER_API_KEY not found. Add it to .env or Streamlit secrets.")
     st.stop()
+
+os.environ["TOGETHER_API_KEY"] = api_key
+# --------------------------------------------------
+
 st.set_page_config(page_title="AI QA Generator", layout="centered")
 st.title("📄 AI BRD → Test Case Generator")
 
@@ -22,7 +32,9 @@ def read_pdf(file):
     text = ""
     with pdfplumber.open(file) as pdf:
         for page in pdf.pages:
-            text += page.extract_text() + "\n"
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
     return text
 
 if uploaded_file:
@@ -38,15 +50,20 @@ if uploaded_file:
 
             for t in crew.tasks:
                 raw = t.output.raw if hasattr(t.output, "raw") else ""
-                if t.name == "brd_analysis": brd = normalize_list(safe_json(raw))
-                elif t.name == "test_scenarios": scenarios = normalize_list(safe_json(raw))
-                elif t.name == "detailed_testcases": tcs = normalize_list(safe_json(raw))
-                elif t.name == "edge_case_review": edges = normalize_list(safe_json(raw))
-                elif t.name == "automation_candidates": auto = normalize_list(safe_json(raw))
+                if t.name == "brd_analysis":
+                    brd = normalize_list(safe_json(raw))
+                elif t.name == "test_scenarios":
+                    scenarios = normalize_list(safe_json(raw))
+                elif t.name == "detailed_testcases":
+                    tcs = normalize_list(safe_json(raw))
+                elif t.name == "edge_case_review":
+                    edges = normalize_list(safe_json(raw))
+                elif t.name == "automation_candidates":
+                    auto = normalize_list(safe_json(raw))
 
             file_name = export_excel(brd, scenarios, tcs, edges, auto)
 
             with open(file_name, "rb") as f:
                 st.download_button("⬇️ Download QA Excel", f, file_name=file_name)
 
-            st.success("Done!")
+            st.success("✅ Done!")
