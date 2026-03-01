@@ -1,5 +1,5 @@
 streamlit==1.31.1
-crewai==1.9.3
+crewai==0.30.11
 litellm==1.44.18
 together==0.2.8
 python-dotenv>=1.1.1,<1.2
